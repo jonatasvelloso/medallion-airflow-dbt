@@ -1,0 +1,68 @@
+# Declaração da camada Bronze.
+#
+# Cada origem vira uma DAG e cada entidade vira uma task gerada pela DAG
+# factory (dags/bronze_dags.py). Para ingerir uma tabela nova basta
+# adicionar um bloco aqui: nenhuma linha de Python precisa mudar.
+#
+#   table             tabela na origem
+#   primary_key       chave usada no upsert da Bronze
+#   incremental_by    coluna de alteração; ausente = carga completa
+#   min_rows          volume mínimo esperado em carga completa (data quality)
+
+defaults:
+  schedule: "15 * * * *"   # a cada hora
+  retries: 2
+  retry_delay_minutes: 5
+
+sources:
+  alfa:
+    description: Alfa Fibra — sistema moderno em português
+    conn_id: src_alfa
+    entities:
+      - name: clientes
+        table: cliente
+        primary_key: [id]
+        min_rows: 100
+      - name: contratos
+        table: contrato
+        primary_key: [id]
+        incremental_by: atualizado_em
+      - name: ordens_servico
+        table: ordem_servico
+        primary_key: [id]
+        incremental_by: atualizado_em
+
+  beta:
+    description: Beta Net — sistema em inglês, valores em centavos
+    conn_id: src_beta
+    entities:
+      - name: clientes
+        table: customers
+        primary_key: [customer_id]
+        min_rows: 100
+      - name: contratos
+        table: subscriptions
+        primary_key: [subscription_id]
+        incremental_by: updated_at
+      - name: ordens_servico
+        table: tickets
+        primary_key: [ticket_id]
+        incremental_by: updated_at
+
+  gama:
+    description: Gama Telecom — sistema legado com datas em texto
+    conn_id: src_gama
+    schedule: "45 */2 * * *"   # legado: janela de leitura a cada 2h
+    entities:
+      - name: clientes
+        table: tb_cliente
+        primary_key: [cod_cliente]
+        min_rows: 100
+      - name: contratos
+        table: tb_contrato
+        primary_key: [cod_contrato]
+        incremental_by: dt_alteracao
+      - name: ordens_servico
+        table: tb_os
+        primary_key: [cod_os]
+        incremental_by: dt_alteracao

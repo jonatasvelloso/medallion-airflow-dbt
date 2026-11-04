@@ -1,0 +1,82 @@
+# Ambiente completo em um comando: `make up`.
+# Um Postgres hospeda as três origens, o DW e os metadados do Airflow.
+
+x-airflow: &airflow
+  build: .
+  environment: &airflow-env
+    AIRFLOW__CORE__EXECUTOR: LocalExecutor
+    AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: postgresql+psycopg2://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/airflow
+    # Conexões do Airflow por variável de ambiente, montadas a partir do .env
+    AIRFLOW_CONN_SRC_ALFA: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/alfa
+    AIRFLOW_CONN_SRC_BETA: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/beta
+    AIRFLOW_CONN_SRC_GAMA: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/gama
+    AIRFLOW_CONN_DW: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/dw
+    AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+    AIRFLOW__CORE__DAGS_ARE_PAUSED_AT_CREATION: "false"
+    AIRFLOW__WEBSERVER__EXPOSE_CONFIG: "false"
+    PYTHONPATH: /opt/airflow/src
+    DBT_PROJECT_DIR: /opt/airflow/dbt
+    # A DAG do dbt é consumidora de Datasets, não produtora.
+    AIRFLOW__COSMOS__ENABLE_DATASET_ALIAS: "False"
+  user: "${AIRFLOW_UID:-50000}:0"
+  volumes:
+    - ./dags:/opt/airflow/dags
+    - ./src:/opt/airflow/src
+    - ./config:/opt/airflow/config
+    - ./dbt:/opt/airflow/dbt
+    - ./scripts:/opt/airflow/scripts
+  depends_on:
+    postgres:
+      condition: service_healthy
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?defina POSTGRES_USER no .env}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?defina POSTGRES_PASSWORD no .env}
+    ports: ["5432:5432"]
+    volumes:
+      - ./scripts/init_databases.sql:/docker-entrypoint-initdb.d/init_databases.sql:ro
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER"]
+      interval: 5s
+      retries: 10
+
+  airflow-init:
+    <<: *airflow
+    environment:
+      <<: *airflow-env
+      AIRFLOW_ADMIN_USER: ${AIRFLOW_ADMIN_USER:?defina AIRFLOW_ADMIN_USER no .env}
+      AIRFLOW_ADMIN_PASSWORD: ${AIRFLOW_ADMIN_PASSWORD:?defina AIRFLOW_ADMIN_PASSWORD no .env}
+      ALFA_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/alfa
+      BETA_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/beta
+      GAMA_DSN: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/gama
+    entrypoint: /bin/bash
+    command:
+      - -c
+      - |
+        airflow db migrate &&
+        airflow users create --username "$$AIRFLOW_ADMIN_USER" --password "$$AIRFLOW_ADMIN_PASSWORD" \
+          --firstname Admin --lastname Local --role Admin --email admin@example.com || true &&
+        python /opt/airflow/scripts/generate_data.py
+    restart: "no"
+
+  airflow-webserver:
+    <<: *airflow
+    command: webserver
+    ports: ["8080:8080"]
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+  airflow-scheduler:
+    <<: *airflow
+    command: scheduler
+    depends_on:
+      airflow-init:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

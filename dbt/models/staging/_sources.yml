@@ -1,0 +1,22 @@
+version: 2
+
+# A Bronze é escrita pelo Airflow; aqui só declaramos de onde ler e o
+# frescor esperado. `dbt source freshness` acusa origem parada.
+sources:
+  - &bronze
+    name: bronze_alfa
+    description: Cópia fiel do sistema da Alfa Fibra (todas as colunas como texto).
+    loaded_at_field: _ingested_at
+    freshness:
+      warn_after: {count: 3, period: hour}
+      error_after: {count: 12, period: hour}
+    tables:
+      - name: clientes
+      - name: contratos
+      - name: ordens_servico
+  - <<: *bronze
+    name: bronze_beta
+    description: Cópia fiel do sistema da Beta Net (todas as colunas como texto).
+  - <<: *bronze
+    name: bronze_gama
+    description: Cópia fiel do sistema legado da Gama Telecom (todas as colunas como texto).

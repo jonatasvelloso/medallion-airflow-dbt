@@ -1,0 +1,104 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  AIRFLOW_VERSION: "2.10.4"
+
+jobs:
+  lint:
+    name: Lint (Ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - run: pip install ruff
+      - run: ruff check .
+      - run: ruff format --check .
+
+  pipeline:
+    name: Testes + pipeline ponta a ponta
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: ci-only
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      # Senha descartável de um Postgres que só existe durante o job
+      PGPASSWORD: ci-only
+      DW_PASSWORD: ci-only
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: requirements-dev.txt
+      - run: pip install -r requirements-dev.txt
+
+      - name: Criar bancos das origens e do DW
+        run: psql -h localhost -U postgres -f scripts/init_databases.sql
+
+      - name: Testes unitários e de integração
+        run: pytest -v
+
+      - name: Carga inicial (dados fictícios → Bronze → Silver/Gold)
+        run: |
+          python scripts/generate_data.py
+          python scripts/run_bronze.py
+          cd dbt && dbt build --profiles-dir .
+
+      - name: Carga incremental (simula um novo dia)
+        run: |
+          python scripts/generate_data.py --increment
+          python scripts/run_bronze.py
+          cd dbt && dbt build --profiles-dir .
+
+      - name: Frescor das origens
+        run: cd dbt && dbt source freshness --profiles-dir .
+
+      - name: Resumo do ingestion log
+        run: |
+          psql -h localhost -U postgres -d dw -c \
+            "select source, entity, mode, rows_extracted, rows_upserted from meta.ingestion_log order by finished_at"
+
+  dag-integrity:
+    name: Integridade das DAGs (Airflow + Cosmos)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Instalar Airflow com constraints oficiais
+        run: |
+          pip install "apache-airflow[postgres]==${AIRFLOW_VERSION}" -r requirements-airflow.txt pytest \
+            --constraint "https://raw.githubusercontent.com/apache/airflow/constraints-${AIRFLOW_VERSION}/constraints-${PYTHON_VERSION}.txt"
+      - name: dbt em virtualenv isolado (igual à imagem Docker)
+        run: |
+          python -m venv /tmp/dbt_venv
+          /tmp/dbt_venv/bin/pip install -r requirements-dbt.txt
+      - name: Carregar DAGs
+        env:
+          AIRFLOW_HOME: /tmp/airflow
+          AIRFLOW__CORE__LOAD_EXAMPLES: "false"
+          AIRFLOW_CONN_DW: postgres://dbt:parse-only@localhost:5432/dw  # só para o dbt ls; não conecta
+          DBT_EXECUTABLE: /tmp/dbt_venv/bin/dbt
+          DBT_PROJECT_DIR: ${{ github.workspace }}/dbt
+        run: |
+          airflow db migrate
+          pytest -v tests/test_dag_integrity.py

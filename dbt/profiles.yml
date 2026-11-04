@@ -1,0 +1,14 @@
+# Usado na linha de comando e no CI. Dentro do Airflow o Cosmos monta o
+# profile a partir da conexão "dw", então nenhuma senha fica no repositório.
+medallion:
+  target: dev
+  outputs:
+    dev:
+      type: postgres
+      host: "{{ env_var('DW_HOST', 'localhost') }}"
+      port: "{{ env_var('DW_PORT', '5432') | int }}"
+      user: "{{ env_var('DW_USER', 'postgres') }}"
+      password: "{{ env_var('DW_PASSWORD') }}"
+      dbname: "{{ env_var('DW_DBNAME', 'dw') }}"
+      schema: public
+      threads: 4

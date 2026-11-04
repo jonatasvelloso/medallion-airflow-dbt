@@ -1,0 +1,54 @@
+version: 2
+
+models:
+  - name: silver_clientes
+    description: Clientes das três empresas, limpos e no mesmo padrão.
+    columns:
+      - name: cliente_sk
+        description: Chave única no formato `<origem>-<id na origem>`.
+        data_tests: [unique, not_null]
+      - name: pessoa_id
+        description: Hash do documento. Une a mesma pessoa entre empresas sem expor o CPF.
+        data_tests: [not_null]
+      - name: origem
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [alfa, beta, gama]
+      - name: uf
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [AC, AL, AP, AM, BA, CE, DF, ES, GO, MA, MT, MS, MG, PA, PB, PR, PE, PI, RJ, RN, RS, RO, RR, SC, SP, SE, TO]
+
+  - name: silver_contratos
+    description: Contratos das três empresas com status padronizado.
+    columns:
+      - name: contrato_sk
+        data_tests: [unique, not_null]
+      - name: cliente_sk
+        data_tests:
+          - not_null
+          - relationships:
+              arguments:
+                to: ref('silver_clientes')
+                field: cliente_sk
+      - name: valor_mensal
+        data_tests: [not_null]
+      - name: status
+        data_tests:
+          - accepted_values:
+              arguments:
+                values: [ativo, suspenso, cancelado]
+
+  - name: silver_ordens_servico
+    description: Ordens de serviço (instalação, reparo, retirada). Carga incremental.
+    columns:
+      - name: ordem_servico_sk
+        data_tests: [unique, not_null]
+      - name: contrato_sk
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('silver_contratos')
+                field: contrato_sk

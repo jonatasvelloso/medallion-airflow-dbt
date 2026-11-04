@@ -1,0 +1,56 @@
+version: 2
+
+models:
+  - name: dim_calendario
+    columns:
+      - name: data
+        data_tests: [unique, not_null]
+
+  - name: dim_clientes
+    description: Uma linha por pessoa, unificando os cadastros das três empresas.
+    columns:
+      - name: pessoa_id
+        data_tests: [unique, not_null]
+      - name: qtd_empresas
+        description: Em quantas empresas do grupo a pessoa tem cadastro.
+
+  - name: dim_planos
+    columns:
+      - name: plano_id
+        data_tests: [unique, not_null]
+      - name: velocidade_mbps
+        data_tests: [not_null]
+
+  - name: fct_contratos
+    description: Fato de contratos (grão = contrato).
+    columns:
+      - name: contrato_sk
+        data_tests: [unique, not_null]
+      - name: pessoa_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_clientes')
+                field: pessoa_id
+      - name: plano_id
+        data_tests:
+          - relationships:
+              arguments:
+                to: ref('dim_planos')
+                field: plano_id
+
+  - name: fct_ordens_servico
+    description: Fato de ordens de serviço com cumprimento de SLA.
+    columns:
+      - name: ordem_servico_sk
+        data_tests: [unique, not_null]
+      - name: sla_horas
+        description: SLA por tipo, mantido na seed `sla_ordens_servico`.
+        data_tests: [not_null]
+
+  - name: mart_base_mensal
+    description: Base ativa, ativações, cancelamentos, churn e MRR por mês e empresa.
+    data_tests:
+      - unique_combination:
+          arguments:
+            columns: [competencia, origem]

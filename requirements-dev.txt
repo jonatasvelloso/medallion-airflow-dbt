@@ -1,0 +1,7 @@
+# Ambiente local / CI fora do Docker
+-r requirements-dbt.txt
+faker>=30
+psycopg2-binary>=2.9
+pyyaml>=6
+pytest>=8
+ruff>=0.6

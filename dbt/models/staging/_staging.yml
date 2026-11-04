@@ -1,0 +1,90 @@
+version: 2
+
+# Contrato da staging: as três origens expõem as mesmas colunas, com os
+# mesmos tipos e vocabulários. Os testes garantem isso antes da Silver.
+
+models:
+  - name: stg_alfa__clientes
+    columns:
+      - name: cliente_sk
+        data_tests: [unique, not_null]
+      - name: documento
+        data_tests: [not_null]
+  - name: stg_alfa__contratos
+    columns:
+      - name: contrato_sk
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ativo, suspenso, cancelado]
+      - name: data_ativacao
+        data_tests: [not_null]
+  - name: stg_alfa__ordens_servico
+    columns:
+      - name: ordem_servico_sk
+        data_tests: [unique, not_null]
+      - name: tipo
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [instalacao, reparo, retirada]
+  - name: stg_beta__clientes
+    columns:
+      - name: cliente_sk
+        data_tests: [unique, not_null]
+      - name: documento
+        data_tests: [not_null]
+  - name: stg_beta__contratos
+    columns:
+      - name: contrato_sk
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ativo, suspenso, cancelado]
+      - name: data_ativacao
+        data_tests: [not_null]
+  - name: stg_beta__ordens_servico
+    columns:
+      - name: ordem_servico_sk
+        data_tests: [unique, not_null]
+      - name: tipo
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [instalacao, reparo, retirada]
+  - name: stg_gama__clientes
+    columns:
+      - name: cliente_sk
+        data_tests: [unique, not_null]
+      - name: documento
+        data_tests: [not_null]
+  - name: stg_gama__contratos
+    columns:
+      - name: contrato_sk
+        data_tests: [unique, not_null]
+      - name: status
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [ativo, suspenso, cancelado]
+      - name: data_ativacao
+        data_tests: [not_null]
+  - name: stg_gama__ordens_servico
+    columns:
+      - name: ordem_servico_sk
+        data_tests: [unique, not_null]
+      - name: tipo
+        data_tests:
+          - not_null
+          - accepted_values:
+              arguments:
+                values: [instalacao, reparo, retirada]

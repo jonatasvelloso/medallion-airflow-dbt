@@ -1,0 +1,8 @@
+version: 2
+
+seeds:
+  - name: sla_ordens_servico
+    description: SLA em horas por tipo de ordem de serviço (regra de negócio versionada).
+    columns:
+      - name: tipo
+        data_tests: [unique, not_null]

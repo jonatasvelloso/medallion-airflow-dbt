@@ -1,0 +1,36 @@
+name: medallion
+version: "1.0.0"
+config-version: 2
+profile: medallion
+
+model-paths: ["models"]
+macro-paths: ["macros"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+target-path: "target"
+clean-targets: ["target", "dbt_packages", "logs"]
+
+vars:
+  # Origens unificadas na Silver. Uma empresa nova entra aqui + staging própria.
+  origens: ["alfa", "beta", "gama"]
+  # Contrato cancelado até N dias após a ativação conta como churn precoce.
+  dias_churn_precoce: 90
+
+models:
+  medallion:
+    staging:
+      +schema: staging
+      +materialized: view
+    silver:
+      +schema: silver
+      +materialized: table
+    gold:
+      +schema: gold
+      +materialized: table
+
+seeds:
+  medallion:
+    +schema: reference
+
+flags:
+  send_anonymous_usage_stats: false

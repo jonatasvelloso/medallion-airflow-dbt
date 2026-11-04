@@ -1,0 +1,4 @@
+tipo,sla_horas,descricao
+instalacao,72,Instalação de novo acesso
+reparo,24,Reparo de acesso com falha
+retirada,120,Retirada de equipamento após cancelamento
